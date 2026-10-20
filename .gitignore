@@ -1,0 +1,27 @@
+# Python
+__pycache__/
+*.py[cod]
+*.egg-info/
+.venv/
+venv/
+env/
+*.sqlite3
+.env
+
+# Node
+node_modules/
+dist/
+frontend/dist/
+.DS_Store
+*.log
+
+# IDE
+.idea/
+.vscode/
+*.swp
+
+# Build
+*.egg
+build/
+.coverage
+htmlcov/
