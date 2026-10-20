@@ -122,9 +122,9 @@ weather-truck-routing/
   README.md
 ```
 
-## Deploy frontend on Vercel (+ 5‑minute health cron)
+## Deploy frontend on Vercel (+ health keepalive)
 
-Django cannot run on Vercel. Host the **API** on Render/Railway/Fly, and the **React app** on Vercel. A Vercel Cron Job hits the backend health endpoint every 5 minutes (keeps free-tier APIs awake).
+Django cannot run on Vercel. Host the **API** on Render/Railway/Fly, and the **React app** on Vercel.
 
 ### 1. Deploy the Django API (e.g. Render)
 
@@ -148,27 +148,27 @@ Django cannot run on Vercel. Host the **API** on Render/Railway/Fly, and the **R
 
 5. Deploy
 
-`vercel.json` already schedules:
+**Hobby plan:** `vercel.json` uses a **daily** cron (allowed on free):
 
 ```json
-{ "path": "/api/cron-health", "schedule": "*/5 * * * *" }
+{ "path": "/api/cron-health", "schedule": "0 12 * * *" }
 ```
 
-That invokes `frontend/api/cron-health.js`, which pings `BACKEND_HEALTH_URL` every 5 minutes on its own.
+### 3. Every-5-minute keepalive (free) — GitHub Actions
 
-Manual check after deploy:
+Vercel Hobby cannot run `*/5 * * * *`. Use the included workflow instead:
+
+1. Repo → **Settings → Secrets and variables → Actions**
+2. New secret: `BACKEND_HEALTH_URL` = `https://YOUR-API/api/health/`
+3. Workflow: `.github/workflows/health-ping.yml` (already set to `*/5 * * * *`)
+4. Optionally run it once via **Actions → Health checkpoint → Run workflow**
+
+Manual Vercel check:
 
 ```text
 GET https://YOUR-APP.vercel.app/api/cron-health
 Authorization: Bearer <CRON_SECRET>
 ```
-
-### Cron plan note
-
-Vercel **Hobby** only allows daily crons. For a true **every 5 minutes** schedule you need **Vercel Pro**, *or* enable the included GitHub Action:
-
-- Repo → Settings → Secrets → `BACKEND_HEALTH_URL`
-- Workflow: `.github/workflows/health-ping.yml` (runs `*/5 * * * *`)
 
 ## Loom walkthrough
 

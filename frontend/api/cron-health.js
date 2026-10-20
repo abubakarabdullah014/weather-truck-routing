@@ -1,6 +1,7 @@
 /**
  * Vercel Cron target — pings the Django /api/health/ endpoint.
- * Scheduled every 5 minutes via vercel.json.
+ * Hobby plan: once daily via vercel.json (0 12 * * * UTC).
+ * For every-5-minute keepalive, use GitHub Actions (.github/workflows/health-ping.yml).
  *
  * Env (set in Vercel project settings):
  *   BACKEND_HEALTH_URL  e.g. https://your-api.onrender.com/api/health/
@@ -51,7 +52,7 @@ export default async function handler(req, res) {
     return res.status(upstream.ok ? 200 : 502).json({
       ok: upstream.ok,
       checkpoint: 'cron-health',
-      interval: '5m',
+      interval: 'daily-vercel-or-5m-github-actions',
       checkedAt: new Date().toISOString(),
       latencyMs: Date.now() - started,
       upstreamStatus: upstream.status,
