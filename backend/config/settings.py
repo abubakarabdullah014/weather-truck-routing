@@ -86,10 +86,19 @@ DEFAULT_AUTO_FIELD = "django.db.models.BigAutoField"
 CORS_ALLOWED_ORIGINS = [
     o.strip()
     for o in os.getenv(
-        "CORS_ALLOWED_ORIGINS", "http://localhost:5173,http://127.0.0.1:5173"
+        "CORS_ALLOWED_ORIGINS",
+        "http://localhost:5173,http://127.0.0.1:5173,https://weather-truck-sandy.vercel.app",
     ).split(",")
     if o.strip()
 ]
+
+# Allow Vercel preview deployments (*.vercel.app)
+if os.getenv("CORS_ALLOW_VERCEL_PREVIEWS", "True").lower() in ("1", "true", "yes"):
+    CORS_ALLOWED_ORIGIN_REGEXES = [
+        r"^https://[\w-]+\.vercel\.app$",
+    ]
+
+CORS_ALLOW_CREDENTIALS = False
 
 REST_FRAMEWORK = {
     "DEFAULT_RENDERER_CLASSES": ["rest_framework.renderers.JSONRenderer"],
