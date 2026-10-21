@@ -2,7 +2,7 @@ export default function ForecastSlider({ hour, onChange, maxHours = 48 }) {
   return (
     <div className="forecast-slider">
       <div className="slider-head">
-        <span>Weather heatmap forecast</span>
+        <span>Weather heatmap (live on current routes — no re-search)</span>
         <strong>
           +{hour}h <span className="muted">/ {maxHours}h</span>
         </strong>
@@ -16,7 +16,7 @@ export default function ForecastSlider({ hour, onChange, maxHours = 48 }) {
         onChange={(e) => onChange(Number(e.target.value))}
       />
       <div className="slider-labels">
-        <span>Now</span>
+        <span>Departure</span>
         <span>+24h</span>
         <span>+48h</span>
       </div>

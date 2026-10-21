@@ -39,7 +39,9 @@ function heatmapSampleAtHour(point, hourOffset, departureIso) {
   let best = hourly[0]
   let bestDiff = Infinity
   for (const h of hourly) {
-    const t = new Date(h.time + (h.time.endsWith('Z') ? '' : 'Z')).getTime()
+    const raw = h.time.endsWith('Z') || h.time.includes('+') ? h.time : `${h.time}Z`
+    const t = new Date(raw).getTime()
+    if (Number.isNaN(t)) continue
     const diff = Math.abs(t - target)
     if (diff < bestDiff) {
       bestDiff = diff
@@ -47,6 +49,14 @@ function heatmapSampleAtHour(point, hourOffset, departureIso) {
     }
   }
   return best
+}
+
+/** Visual strength 0–1 so calm hours still show slider movement. */
+function weatherStrength(wind, rain, snow) {
+  return Math.min(
+    1,
+    Math.max(wind / 40, rain / 0.35, snow / 1.5, 0.08),
+  )
 }
 
 export default function RouteMap({
@@ -74,10 +84,27 @@ export default function RouteMap({
           sample.snow_in_hr,
           loadLb,
         )
-        return { lat: p.lat, lon: p.lon, risk, sample }
+        const strength = weatherStrength(
+          sample.wind_mph,
+          sample.rain_in_hr,
+          sample.snow_in_hr,
+        )
+        return { lat: p.lat, lon: p.lon, risk, sample, strength }
       })
       .filter(Boolean)
   }, [result, forecastHour, showHeatmap, loadLb])
+
+  const heatmapStats = useMemo(() => {
+    if (!heatmapLayers.length) return null
+    const avgWind =
+      heatmapLayers.reduce((s, p) => s + (p.sample.wind_mph || 0), 0) /
+      heatmapLayers.length
+    const risks = {}
+    for (const p of heatmapLayers) {
+      risks[p.risk] = (risks[p.risk] || 0) + 1
+    }
+    return { avgWind, risks, count: heatmapLayers.length }
+  }, [heatmapLayers])
 
   return (
     <div className="map-wrap">
@@ -85,20 +112,22 @@ export default function RouteMap({
         <TileLayer attribution={TILE_ATTR} url={TILE_URL} />
         <FitBounds routes={routes} />
 
+        {/* Heatmap under routes — remount on hour so Leaflet redraws */}
         {heatmapLayers.map((p, i) => (
           <CircleMarker
-            key={`hm-${i}`}
+            key={`hm-${forecastHour}-${i}-${p.risk}-${Math.round(p.strength * 100)}`}
             center={[p.lat, p.lon]}
-            radius={14}
+            radius={10 + p.strength * 14}
             pathOptions={{
               color: RISK_COLORS[p.risk],
               fillColor: RISK_COLORS[p.risk],
-              fillOpacity: 0.32,
-              weight: 0,
+              fillOpacity: 0.25 + p.strength * 0.45,
+              weight: 1,
+              opacity: 0.7,
             }}
           >
             <Popup>
-              Heatmap @ +{forecastHour}h (load {loadLb.toLocaleString()} lb)
+              Corridor weather @ <strong>+{forecastHour}h</strong>
               <br />
               Risk: {p.risk}
               <br />
@@ -125,7 +154,6 @@ export default function RouteMap({
           )
         })}
 
-        {/* All route checkpoints — selected route emphasized */}
         {routes.flatMap((route) =>
           (route.checkpoints || []).map((cp, i) => {
             const isSelected = route.id === selectedId
@@ -194,6 +222,16 @@ export default function RouteMap({
           </span>
         ))}
       </div>
+
+      {showHeatmap && heatmapStats && (
+        <div className="heatmap-hud">
+          Forecast <strong>+{forecastHour}h</strong>
+          {' · '}
+          avg wind <strong>{heatmapStats.avgWind.toFixed(1)} mph</strong>
+          {' · '}
+          {heatmapStats.count} corridor points
+        </div>
+      )}
     </div>
   )
 }
