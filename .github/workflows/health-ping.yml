@@ -1,5 +1,4 @@
-# Free fallback keepalive if Vercel Hobby can't run 5-minute crons.
-# Pings BACKEND_HEALTH_URL every 5 minutes.
+# Keep the Vercel serverless backend warm (Hobby has no 5-min crons).
 name: Health checkpoint
 
 on:
@@ -15,11 +14,19 @@ jobs:
         env:
           HEALTH_URL: ${{ secrets.BACKEND_HEALTH_URL }}
         run: |
-          if [ -z "$HEALTH_URL" ]; then
-            echo "Set repo secret BACKEND_HEALTH_URL (e.g. https://api.example.com/api/health/)"
-            exit 1
-          fi
-          code=$(curl -sS -o /tmp/health.json -w "%{http_code}" "$HEALTH_URL")
-          echo "HTTP $code"
-          cat /tmp/health.json
-          test "$code" = "200"
+          # Fallback = current production backend (avoids stale/missing secrets)
+          URL="${HEALTH_URL:-https://truck-weather-route-backend.vercel.app/api/health/}"
+          echo "Pinging $URL"
+          ok=0
+          for i in 1 2 3; do
+            code=$(curl -sS -m 45 -o /tmp/health.json -w "%{http_code}" "$URL" || echo "000")
+            echo "Attempt $i → HTTP $code"
+            cat /tmp/health.json 2>/dev/null || true
+            echo
+            if [ "$code" = "200" ]; then
+              ok=1
+              break
+            fi
+            sleep $((i * 5))
+          done
+          test "$ok" = "1"

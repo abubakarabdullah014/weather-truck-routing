@@ -102,13 +102,28 @@ CORS_ALLOWED_ORIGINS = [
     if o.strip()
 ]
 
-# Allow Vercel preview deployments (*.vercel.app)
-if os.getenv("CORS_ALLOW_VERCEL_PREVIEWS", "True").lower() in ("1", "true", "yes"):
-    CORS_ALLOWED_ORIGIN_REGEXES = [
-        r"^https://[\w-]+\.vercel\.app$",
-    ]
+# Always allow Vercel preview / production aliases (*.vercel.app)
+# so domain renames / redirects don't break CORS again.
+CORS_ALLOWED_ORIGIN_REGEXES = [
+    r"^https://[\w.-]+\.vercel\.app$",
+]
+if os.getenv("CORS_ALLOW_VERCEL_PREVIEWS", "True").lower() not in (
+    "1",
+    "true",
+    "yes",
+):
+    CORS_ALLOWED_ORIGIN_REGEXES = []
 
 CORS_ALLOW_CREDENTIALS = False
+CORS_ALLOW_HEADERS = [
+    "accept",
+    "authorization",
+    "content-type",
+    "user-agent",
+    "x-csrftoken",
+    "x-requested-with",
+]
+CORS_PREFLIGHT_MAX_AGE = 86400
 
 REST_FRAMEWORK = {
     "DEFAULT_RENDERER_CLASSES": ["rest_framework.renderers.JSONRenderer"],

@@ -1,12 +1,12 @@
 /**
- * Vercel Cron target — pings the Django /api/health/ endpoint.
- * Hobby plan: once daily via vercel.json (0 12 * * * UTC).
- * For every-5-minute keepalive, use GitHub Actions (.github/workflows/health-ping.yml).
+ * Vercel Cron — pings Django /api/health/ to reduce cold starts.
+ * Hobby: daily via vercel.json. Prefer GitHub Actions every 5 min.
  *
- * Env (set in Vercel project settings):
- *   BACKEND_HEALTH_URL  e.g. https://your-api.onrender.com/api/health/
- *   CRON_SECRET         shared secret (Vercel sends Authorization: Bearer <CRON_SECRET>)
+ * Optional env: BACKEND_HEALTH_URL, VITE_API_BASE_URL, CRON_SECRET
  */
+const DEFAULT_HEALTH =
+  'https://truck-weather-route-backend.vercel.app/api/health/'
+
 export default async function handler(req, res) {
   if (req.method !== 'GET') {
     res.setHeader('Allow', 'GET')
@@ -25,48 +25,47 @@ export default async function handler(req, res) {
     process.env.BACKEND_HEALTH_URL ||
     (process.env.VITE_API_BASE_URL
       ? `${process.env.VITE_API_BASE_URL.replace(/\/$/, '')}/health/`
-      : null)
-
-  if (!healthUrl) {
-    return res.status(500).json({
-      ok: false,
-      error: 'BACKEND_HEALTH_URL (or VITE_API_BASE_URL) is not configured',
-    })
-  }
+      : DEFAULT_HEALTH)
 
   const started = Date.now()
-  try {
-    const upstream = await fetch(healthUrl, {
-      method: 'GET',
-      headers: { Accept: 'application/json' },
-      cache: 'no-store',
-    })
-    const text = await upstream.text()
-    let body
+  // Retry once — cron itself can hit a cold start
+  for (let attempt = 0; attempt < 2; attempt++) {
     try {
-      body = JSON.parse(text)
-    } catch {
-      body = { raw: text.slice(0, 200) }
-    }
+      const upstream = await fetch(healthUrl, {
+        method: 'GET',
+        headers: { Accept: 'application/json' },
+        cache: 'no-store',
+      })
+      const text = await upstream.text()
+      let body
+      try {
+        body = JSON.parse(text)
+      } catch {
+        body = { raw: text.slice(0, 200) }
+      }
 
-    return res.status(upstream.ok ? 200 : 502).json({
-      ok: upstream.ok,
-      checkpoint: 'cron-health',
-      interval: 'daily-vercel-or-5m-github-actions',
-      checkedAt: new Date().toISOString(),
-      latencyMs: Date.now() - started,
-      upstreamStatus: upstream.status,
-      upstreamUrl: healthUrl,
-      upstream: body,
-    })
-  } catch (err) {
-    return res.status(502).json({
-      ok: false,
-      checkpoint: 'cron-health',
-      checkedAt: new Date().toISOString(),
-      latencyMs: Date.now() - started,
-      upstreamUrl: healthUrl,
-      error: err.message || String(err),
-    })
+      if (!upstream.ok && attempt === 0) continue
+
+      return res.status(upstream.ok ? 200 : 502).json({
+        ok: upstream.ok,
+        checkpoint: 'cron-health',
+        interval: 'daily-vercel-or-5m-github-actions',
+        checkedAt: new Date().toISOString(),
+        latencyMs: Date.now() - started,
+        upstreamStatus: upstream.status,
+        upstreamUrl: healthUrl,
+        upstream: body,
+      })
+    } catch (err) {
+      if (attempt === 0) continue
+      return res.status(502).json({
+        ok: false,
+        checkpoint: 'cron-health',
+        checkedAt: new Date().toISOString(),
+        latencyMs: Date.now() - started,
+        upstreamUrl: healthUrl,
+        error: err.message || String(err),
+      })
+    }
   }
 }
