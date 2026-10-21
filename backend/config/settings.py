@@ -96,8 +96,8 @@ CORS_ALLOWED_ORIGINS = [
     for o in os.getenv(
         "CORS_ALLOWED_ORIGINS",
         "http://localhost:5173,http://127.0.0.1:5173,"
-        "https://weather-truck-routing-two.vercel.app,"
-        "https://weather-truck-sandy.vercel.app",
+        "https://truck-weather-route.vercel.app,"
+        "https://frontend-nine-chi-u07luqtijn.vercel.app",
     ).split(",")
     if o.strip()
 ]

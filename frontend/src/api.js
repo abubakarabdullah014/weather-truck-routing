@@ -7,12 +7,11 @@ function normalizeApiBase(raw) {
   return base
 }
 
-// IMPORTANT: Vercel builds from Git; gitignored .env is NOT used unless you set
- // Project → Environment Variables. PROD fallback guarantees the live site works.
+// Production default = stable backend domain (avoid old redirected URLs — fetch fails on 307)
 const API_BASE = normalizeApiBase(
   import.meta.env.VITE_API_BASE_URL ||
     (import.meta.env.PROD
-      ? 'https://backend-ten-gilt-82.vercel.app/api'
+      ? 'https://truck-weather-route-backend.vercel.app/api'
       : 'http://127.0.0.1:8000/api'),
 )
 
