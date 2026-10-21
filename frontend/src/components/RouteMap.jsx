@@ -19,16 +19,13 @@ const TILE_ATTR =
 
 const ROUTE_COLORS = ['#1a73e8', '#0f9d58', '#db4437']
 
-function FitBounds({ routes }) {
+function FitBounds({ route }) {
   const map = useMap()
   useEffect(() => {
-    const pts = []
-    for (const r of routes || []) {
-      for (const c of r.coordinates || []) pts.push(c)
-    }
+    const pts = route?.coordinates || []
     if (pts.length < 2) return
     map.fitBounds(L.latLngBounds(pts), { padding: [40, 40] })
-  }, [map, routes])
+  }, [map, route])
   return null
 }
 
@@ -66,6 +63,13 @@ export default function RouteMap({
   showHeatmap,
 }) {
   const routes = result?.routes || []
+  const selectedRoute = useMemo(
+    () => routes.find((r) => r.id === selectedId) || routes[0] || null,
+    [routes, selectedId],
+  )
+  const selectedIdx = selectedRoute
+    ? Math.max(0, routes.findIndex((r) => r.id === selectedRoute.id))
+    : 0
   const loadLb = result?.load_weight_lb || 0
   const center = useMemo(() => {
     if (result?.origin) return [result.origin.lat, result.origin.lon]
@@ -110,9 +114,9 @@ export default function RouteMap({
     <div className="map-wrap">
       <MapContainer center={center} zoom={6} scrollWheelZoom className="map">
         <TileLayer attribution={TILE_ATTR} url={TILE_URL} />
-        <FitBounds routes={routes} />
+        <FitBounds route={selectedRoute} />
 
-        {/* Heatmap under routes — remount on hour so Leaflet redraws */}
+        {/* Heatmap under selected route — remount on hour so Leaflet redraws */}
         {heatmapLayers.map((p, i) => (
           <CircleMarker
             key={`hm-${forecastHour}-${i}-${p.risk}-${Math.round(p.strength * 100)}`}
@@ -137,53 +141,45 @@ export default function RouteMap({
           </CircleMarker>
         ))}
 
-        {routes.map((route, idx) => {
-          const isSelected = route.id === selectedId
-          const isBest = route.recommended
-          return (
-            <Polyline
-              key={`route-${route.id}`}
-              positions={route.coordinates}
-              pathOptions={{
-                color: ROUTE_COLORS[idx % ROUTE_COLORS.length],
-                weight: isSelected ? 7 : 4,
-                opacity: isSelected ? 0.95 : 0.5,
-                dashArray: isBest && !isSelected ? '8 10' : undefined,
-              }}
-            />
-          )
-        })}
-
-        {routes.flatMap((route) =>
-          (route.checkpoints || []).map((cp, i) => {
-            const isSelected = route.id === selectedId
-            return (
-              <CircleMarker
-                key={`cp-${route.id}-${i}`}
-                center={[cp.lat, cp.lon]}
-                radius={isSelected ? 7 : 4}
-                pathOptions={{
-                  color: isSelected ? '#111' : ROUTE_COLORS[(route.id - 1) % 3],
-                  weight: 1,
-                  fillColor: RISK_COLORS[cp.risk] || '#888',
-                  fillOpacity: isSelected ? 0.95 : 0.55,
-                }}
-              >
-                <Popup>
-                  <strong>
-                    {route.label} · {cp.distance_miles} mi — {cp.risk}
-                  </strong>
-                  <br />
-                  ETA {formatEta(cp.eta)}
-                  <br />
-                  Wind {cp.wind_mph} mph
-                  <br />
-                  Rain {cp.rain_in_hr} in/h · Snow {cp.snow_in_hr} in/h
-                </Popup>
-              </CircleMarker>
-            )
-          }),
+        {/* Only the selected route line + checkpoint circles */}
+        {selectedRoute && (
+          <Polyline
+            key={`route-${selectedRoute.id}`}
+            positions={selectedRoute.coordinates}
+            pathOptions={{
+              color: ROUTE_COLORS[selectedIdx % ROUTE_COLORS.length],
+              weight: 7,
+              opacity: 0.95,
+            }}
+          />
         )}
+
+        {selectedRoute &&
+          (selectedRoute.checkpoints || []).map((cp, i) => (
+            <CircleMarker
+              key={`cp-${selectedRoute.id}-${i}`}
+              center={[cp.lat, cp.lon]}
+              radius={7}
+              pathOptions={{
+                color: '#111',
+                weight: 1,
+                fillColor: RISK_COLORS[cp.risk] || '#888',
+                fillOpacity: 0.95,
+              }}
+            >
+              <Popup>
+                <strong>
+                  {selectedRoute.label} · {cp.distance_miles} mi — {cp.risk}
+                </strong>
+                <br />
+                ETA {formatEta(cp.eta)}
+                <br />
+                Wind {cp.wind_mph} mph
+                <br />
+                Rain {cp.rain_in_hr} in/h · Snow {cp.snow_in_hr} in/h
+              </Popup>
+            </CircleMarker>
+          ))}
 
         {result?.origin && (
           <CircleMarker
