@@ -30,55 +30,34 @@ export async function healthCheck() {
   return res.json()
 }
 
-/**
- * Keep pinging until the serverless function is awake.
- * Cold starts + flaky DNS are the usual "Failed to fetch" causes.
- */
-export async function ensureWarm({ attempts = 6, delayMs = 1500 } = {}) {
-  let lastErr
-  for (let i = 0; i < attempts; i++) {
-    try {
-      await healthCheck()
-      return true
-    } catch (err) {
-      lastErr = err
-      await sleep(delayMs * (i + 1))
-    }
-  }
-  throw lastErr || new Error('API warmup failed')
-}
-
+/** One quick ping — never blocks the UI with long retry loops. */
 export async function warmApi() {
   try {
-    await ensureWarm({ attempts: 4, delayMs: 1200 })
+    await healthCheck()
     return true
   } catch {
     return false
   }
 }
 
-async function fetchWithRetry(url, options, { retries = 3 } = {}) {
+async function fetchWithRetry(url, options, { retries = 1 } = {}) {
   let lastErr
   for (let attempt = 0; attempt <= retries; attempt++) {
     try {
-      if (attempt > 0) {
-        await ensureWarm({ attempts: 3, delayMs: 1000 }).catch(() => {})
-        await sleep(1000 * attempt)
-      }
-      const res = await fetch(url, options)
-      return res
+      if (attempt > 0) await sleep(700)
+      return await fetch(url, options)
     } catch (err) {
       lastErr = err
     }
   }
   throw new Error(
-    `Cannot reach API at ${API_BASE}. Check your internet, wait a few seconds, then try again. (${lastErr?.message || 'Failed to fetch'})`,
+    `Cannot reach API at ${API_BASE}. (${lastErr?.message || 'Failed to fetch'})`,
   )
 }
 
 export async function planTrip(payload) {
-  // Always wake first so CORS preflight + POST don't share one cold start
-  await ensureWarm({ attempts: 5, delayMs: 1200 })
+  // Light wake (ignore failure — plan request itself wakes the function)
+  await warmApi()
 
   const res = await fetchWithRetry(
     `${API_BASE}/plan/`,
@@ -91,7 +70,7 @@ export async function planTrip(payload) {
       body: JSON.stringify(payload),
       cache: 'no-store',
     },
-    { retries: 3 },
+    { retries: 1 },
   )
 
   const data = await res.json().catch(() => ({}))

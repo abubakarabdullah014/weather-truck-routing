@@ -14,35 +14,23 @@ export default function App() {
   const [selectedId, setSelectedId] = useState(null)
   const [forecastHour, setForecastHour] = useState(0)
   const [showHeatmap, setShowHeatmap] = useState(true)
-  const [apiStatus, setApiStatus] = useState('connecting') // connecting | ready | offline
-  const [everReady, setEverReady] = useState(false)
+  const [apiStatus, setApiStatus] = useState('ready') // ready | offline — don't block UI
 
-  // Wake backend on load + keep it warm while the tab is open
+  // Background ping only — never lock the form
   useEffect(() => {
     let cancelled = false
 
     async function ping() {
       const ok = await warmApi()
-      if (cancelled) return
-      if (ok) {
-        setApiStatus('ready')
-        setEverReady(true)
-      } else {
-        setApiStatus('offline')
-      }
+      if (!cancelled) setApiStatus(ok ? 'ready' : 'offline')
     }
 
     ping()
-    const id = setInterval(ping, 4 * 60 * 1000)
-    const onVisible = () => {
-      if (document.visibilityState === 'visible') ping()
-    }
-    document.addEventListener('visibilitychange', onVisible)
+    const id = setInterval(ping, 5 * 60 * 1000)
 
     return () => {
       cancelled = true
       clearInterval(id)
-      document.removeEventListener('visibilitychange', onVisible)
     }
   }, [])
 
@@ -60,7 +48,6 @@ export default function App() {
       setSelectedId(data.recommendation?.recommended_route_id || data.routes[0]?.id)
       setForecastHour(0)
       setApiStatus('ready')
-      setEverReady(true)
     } catch (err) {
       setError(err.message || 'Failed to plan trip')
       setResult(null)
@@ -84,28 +71,15 @@ export default function App() {
 
       <div className="layout">
         <aside className="sidebar">
-          <p
-            className={
-              apiStatus === 'ready'
-                ? 'api-status api-status--ok'
-                : apiStatus === 'offline'
-                  ? 'api-status api-status--bad'
-                  : 'api-status'
-            }
-            role="status"
-          >
-            {apiStatus === 'ready' && 'API connected'}
-            {apiStatus === 'connecting' && 'Waking API…'}
-            {apiStatus === 'offline' && 'API offline — retry in a moment'}
-          </p>
-          <TripForm
-            onSubmit={handlePlan}
-            loading={loading || (apiStatus === 'connecting' && !everReady)}
-          />
+          {apiStatus === 'offline' && (
+            <p className="api-status api-status--bad" role="status">
+              API may be waking — you can still plan; retry if it fails.
+            </p>
+          )}
+          <TripForm onSubmit={handlePlan} loading={loading} />
           {loading && (
             <p className="loading-banner">
               Building up to 3 routes, sampling weather at ETAs, scoring risk…
-              First request after idle can take ~30s while the server wakes.
             </p>
           )}
           {error && <p className="error">{error}</p>}
