@@ -36,14 +36,49 @@ export function formatEta(iso) {
   }
 }
 
-/** Classify a heatmap hour sample into a risk color using wind/rain/snow only. */
-export function conditionsToRisk(wind, rain, snow) {
-  const windR =
-    wind < 25 ? 'Low' : wind < 35 ? 'Moderate' : wind < 45 ? 'High' : wind < 55 ? 'Severe' : 'No Travel'
-  const rainR =
-    rain < 0.1 ? 'Low' : rain <= 0.25 ? 'Moderate' : rain <= 0.5 ? 'High' : rain <= 1 ? 'Severe' : 'No Travel'
-  const snowR =
-    snow < 0.5 ? 'Low' : snow <= 1 ? 'Moderate' : snow <= 2 ? 'High' : snow <= 3 ? 'Severe' : 'No Travel'
-  const levels = [windR, rainR, snowR]
-  return levels.reduce((a, b) => (RISK_SCORE[b] > RISK_SCORE[a] ? b : a), 'Low')
+function classifyWind(mph) {
+  if (mph < 25) return 'Low'
+  if (mph < 35) return 'Moderate'
+  if (mph < 45) return 'High'
+  if (mph < 55) return 'Severe'
+  return 'No Travel'
+}
+
+function classifyRain(inHr) {
+  if (inHr < 0.1) return 'Low'
+  if (inHr <= 0.25) return 'Moderate'
+  if (inHr <= 0.5) return 'High'
+  if (inHr <= 1) return 'Severe'
+  return 'No Travel'
+}
+
+function classifySnow(inHr) {
+  if (inHr < 0.5) return 'Low'
+  if (inHr <= 1) return 'Moderate'
+  if (inHr <= 2) return 'High'
+  if (inHr <= 3) return 'Severe'
+  return 'No Travel'
+}
+
+function applyLoadRules(windMph, loadLb, base) {
+  if (windMph >= 55) return 'No Travel'
+  if (windMph >= 45 && windMph < 55 && loadLb > 30000) return 'No Travel'
+  if (windMph >= 35 && windMph < 45 && loadLb > 40000) {
+    return RISK_SCORE[base] < RISK_SCORE.Severe ? 'Severe' : base
+  }
+  return base
+}
+
+/**
+ * Classify weather (+ optional load) into risk — same rules as backend.
+ */
+export function conditionsToRisk(wind, rain, snow, loadLb = 0) {
+  const windR = classifyWind(wind)
+  const rainR = classifyRain(rain)
+  const snowR = classifySnow(snow)
+  const combined = [windR, rainR, snowR].reduce(
+    (a, b) => (RISK_SCORE[b] > RISK_SCORE[a] ? b : a),
+    'Low',
+  )
+  return applyLoadRules(wind, Number(loadLb) || 0, combined)
 }

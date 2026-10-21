@@ -5,7 +5,7 @@ React + Django app that recommends the safest truck route using live weather, lo
 ## Features
 
 - Geocode origin & destination
-- Generate up to **3 route alternatives** (OpenRouteService, with OSRM fallback)
+- Generate **3 distinct route options** (OpenRouteService + OSRM + via-point corridors when needed)
 - Sample weather every **10 / 25 / 50 miles** at the truck’s ETA for each checkpoint
 - Classify risk (Wind / Rain / Snow) + load-weight overrides
 - Recommend the best route: fewest Severe → High → lowest avg risk → shortest time

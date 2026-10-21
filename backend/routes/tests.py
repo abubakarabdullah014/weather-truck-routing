@@ -1,5 +1,6 @@
 from django.test import SimpleTestCase
 
+from routes.services.recommendation import recommend
 from routes.services.risk import assess_checkpoint, classify_rain, classify_snow, classify_wind
 
 
@@ -53,3 +54,71 @@ class RiskRulesTests(SimpleTestCase):
         self.assertEqual(
             assess_checkpoint(40, 0, 0, 40000)["risk"], "High"
         )
+
+
+class RecommendationTests(SimpleTestCase):
+    def _route(self, rid, severe_seg, high_seg, avg_scores, duration_s, miles=100.0):
+        """Build a minimal route with two segments of known risk."""
+        cps = [
+            {"distance_miles": 0, "risk": "Low", "risk_score": 1},
+            {
+                "distance_miles": severe_seg,
+                "risk": "Severe",
+                "risk_score": 4,
+            },
+            {
+                "distance_miles": severe_seg + high_seg,
+                "risk": "High",
+                "risk_score": 3,
+            },
+            {
+                "distance_miles": miles,
+                "risk": "Low",
+                "risk_score": 1,
+            },
+        ]
+        # Override scores for avg_risk if provided
+        if avg_scores:
+            for cp, score in zip(cps, avg_scores):
+                cp["risk_score"] = score
+                inv = {1: "Low", 2: "Moderate", 3: "High", 4: "Severe", 5: "No Travel"}
+                cp["risk"] = inv[score]
+        return {
+            "id": rid,
+            "label": f"Route {rid}",
+            "duration_s": duration_s,
+            "distance_miles": miles,
+            "checkpoints": cps,
+        }
+
+    def test_prefers_fewest_severe_miles(self):
+        routes = [
+            self._route(1, severe_seg=40, high_seg=10, avg_scores=None, duration_s=3600),
+            self._route(2, severe_seg=10, high_seg=40, avg_scores=None, duration_s=4000),
+        ]
+        result = recommend(routes)
+        self.assertEqual(result["recommended_route_id"], 2)
+
+    def test_then_fewest_high_then_time(self):
+        # Equal severe (0), route 1 has more high miles → pick 2
+        r1 = {
+            "id": 1,
+            "duration_s": 3000,
+            "distance_miles": 100,
+            "checkpoints": [
+                {"distance_miles": 0, "risk": "Low", "risk_score": 1},
+                {"distance_miles": 50, "risk": "High", "risk_score": 3},
+                {"distance_miles": 100, "risk": "Low", "risk_score": 1},
+            ],
+        }
+        r2 = {
+            "id": 2,
+            "duration_s": 5000,
+            "distance_miles": 100,
+            "checkpoints": [
+                {"distance_miles": 0, "risk": "Low", "risk_score": 1},
+                {"distance_miles": 10, "risk": "High", "risk_score": 3},
+                {"distance_miles": 100, "risk": "Low", "risk_score": 1},
+            ],
+        }
+        self.assertEqual(recommend([r1, r2])["recommended_route_id"], 2)

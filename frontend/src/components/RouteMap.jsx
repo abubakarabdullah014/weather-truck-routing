@@ -56,6 +56,7 @@ export default function RouteMap({
   showHeatmap,
 }) {
   const routes = result?.routes || []
+  const loadLb = result?.load_weight_lb || 0
   const center = useMemo(() => {
     if (result?.origin) return [result.origin.lat, result.origin.lon]
     return [39.5, -98.35]
@@ -71,20 +72,16 @@ export default function RouteMap({
           sample.wind_mph,
           sample.rain_in_hr,
           sample.snow_in_hr,
+          loadLb,
         )
         return { lat: p.lat, lon: p.lon, risk, sample }
       })
       .filter(Boolean)
-  }, [result, forecastHour, showHeatmap])
+  }, [result, forecastHour, showHeatmap, loadLb])
 
   return (
     <div className="map-wrap">
-      <MapContainer
-        center={center}
-        zoom={6}
-        scrollWheelZoom
-        className="map"
-      >
+      <MapContainer center={center} zoom={6} scrollWheelZoom className="map">
         <TileLayer attribution={TILE_ATTR} url={TILE_URL} />
         <FitBounds routes={routes} />
 
@@ -96,12 +93,12 @@ export default function RouteMap({
             pathOptions={{
               color: RISK_COLORS[p.risk],
               fillColor: RISK_COLORS[p.risk],
-              fillOpacity: 0.35,
+              fillOpacity: 0.32,
               weight: 0,
             }}
           >
             <Popup>
-              Heatmap @ +{forecastHour}h
+              Heatmap @ +{forecastHour}h (load {loadLb.toLocaleString()} lb)
               <br />
               Risk: {p.risk}
               <br />
@@ -121,31 +118,32 @@ export default function RouteMap({
               pathOptions={{
                 color: ROUTE_COLORS[idx % ROUTE_COLORS.length],
                 weight: isSelected ? 7 : 4,
-                opacity: isSelected ? 0.95 : 0.45,
+                opacity: isSelected ? 0.95 : 0.5,
                 dashArray: isBest && !isSelected ? '8 10' : undefined,
               }}
             />
           )
         })}
 
-        {routes
-          .filter((r) => r.id === selectedId)
-          .flatMap((route) =>
-            (route.checkpoints || []).map((cp, i) => (
+        {/* All route checkpoints — selected route emphasized */}
+        {routes.flatMap((route) =>
+          (route.checkpoints || []).map((cp, i) => {
+            const isSelected = route.id === selectedId
+            return (
               <CircleMarker
                 key={`cp-${route.id}-${i}`}
                 center={[cp.lat, cp.lon]}
-                radius={7}
+                radius={isSelected ? 7 : 4}
                 pathOptions={{
-                  color: '#111',
+                  color: isSelected ? '#111' : ROUTE_COLORS[(route.id - 1) % 3],
                   weight: 1,
                   fillColor: RISK_COLORS[cp.risk] || '#888',
-                  fillOpacity: 0.95,
+                  fillOpacity: isSelected ? 0.95 : 0.55,
                 }}
               >
                 <Popup>
                   <strong>
-                    {cp.distance_miles} mi — {cp.risk}
+                    {route.label} · {cp.distance_miles} mi — {cp.risk}
                   </strong>
                   <br />
                   ETA {formatEta(cp.eta)}
@@ -155,14 +153,20 @@ export default function RouteMap({
                   Rain {cp.rain_in_hr} in/h · Snow {cp.snow_in_hr} in/h
                 </Popup>
               </CircleMarker>
-            )),
-          )}
+            )
+          }),
+        )}
 
         {result?.origin && (
           <CircleMarker
             center={[result.origin.lat, result.origin.lon]}
             radius={9}
-            pathOptions={{ color: '#111', fillColor: '#fff', fillOpacity: 1, weight: 2 }}
+            pathOptions={{
+              color: '#111',
+              fillColor: '#fff',
+              fillOpacity: 1,
+              weight: 2,
+            }}
           >
             <Popup>Origin: {result.origin.display_name}</Popup>
           </CircleMarker>
@@ -171,7 +175,12 @@ export default function RouteMap({
           <CircleMarker
             center={[result.destination.lat, result.destination.lon]}
             radius={9}
-            pathOptions={{ color: '#111', fillColor: '#222', fillOpacity: 1, weight: 2 }}
+            pathOptions={{
+              color: '#111',
+              fillColor: '#222',
+              fillOpacity: 1,
+              weight: 2,
+            }}
           >
             <Popup>Destination: {result.destination.display_name}</Popup>
           </CircleMarker>

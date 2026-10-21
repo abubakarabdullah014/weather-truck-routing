@@ -51,6 +51,11 @@ export default function App() {
       <div className="layout">
         <aside className="sidebar">
           <TripForm onSubmit={handlePlan} loading={loading} />
+          {loading && (
+            <p className="loading-banner">
+              Building up to 3 routes, sampling weather at ETAs, scoring risk…
+            </p>
+          )}
           {error && <p className="error">{error}</p>}
           <RouteSummary
             result={result}

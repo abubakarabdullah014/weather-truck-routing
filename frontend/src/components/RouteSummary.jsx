@@ -12,11 +12,21 @@ export default function RouteSummary({ result, selectedId, onSelect }) {
       {recommendation && (
         <div className="recommend-banner">
           <strong>Recommended: Route {recommendedId}</strong>
+          <p className="rank-note">
+            Ranked by: fewest Severe miles → fewest High miles → lowest avg risk →
+            shortest time
+          </p>
           <ul>
             {recommendation.reasons.map((r) => (
               <li key={r}>{r}</li>
             ))}
           </ul>
+          {routes.length < 3 && (
+            <p className="rank-note">
+              Showing {routes.length} distinct corridor option
+              {routes.length === 1 ? '' : 's'} for this OD pair.
+            </p>
+          )}
         </div>
       )}
 
