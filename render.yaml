@@ -1,0 +1,23 @@
+# Deploy backend on Render: New → Blueprint → connect this repo
+services:
+  - type: web
+    name: weather-truck-api
+    runtime: python
+    rootDir: backend
+    buildCommand: pip install -r requirements.txt
+    startCommand: gunicorn config.wsgi:application --bind 0.0.0.0:$PORT
+    envVars:
+      - key: DJANGO_SECRET_KEY
+        generateValue: true
+      - key: DJANGO_DEBUG
+        value: "False"
+      - key: DJANGO_ALLOWED_HOSTS
+        value: ".onrender.com"
+      - key: CORS_ALLOWED_ORIGINS
+        value: "https://weather-truck-sandy.vercel.app"
+      - key: CORS_ALLOW_VERCEL_PREVIEWS
+        value: "True"
+      - key: ORS_API_KEY
+        sync: false
+      - key: GEOCODER_USER_AGENT
+        value: "WeatherTruckRouting/1.0 (abubakarabdullah014)"
