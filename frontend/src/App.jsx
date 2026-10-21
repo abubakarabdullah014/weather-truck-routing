@@ -1,10 +1,10 @@
-import { useMemo, useState } from 'react'
+import { useEffect, useMemo, useState } from 'react'
 import TripForm from './components/TripForm'
 import RouteSummary from './components/RouteSummary'
 import CheckpointList from './components/CheckpointList'
 import ForecastSlider from './components/ForecastSlider'
 import RouteMap from './components/RouteMap'
-import { planTrip } from './api'
+import { planTrip, warmApi } from './api'
 import './App.css'
 
 export default function App() {
@@ -14,6 +14,11 @@ export default function App() {
   const [selectedId, setSelectedId] = useState(null)
   const [forecastHour, setForecastHour] = useState(0)
   const [showHeatmap, setShowHeatmap] = useState(true)
+
+  // Wake serverless backend on page load (avoids Failed to fetch on first Plan)
+  useEffect(() => {
+    warmApi()
+  }, [])
 
   const selectedRoute = useMemo(() => {
     if (!result) return null
