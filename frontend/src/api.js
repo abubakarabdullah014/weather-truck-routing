@@ -1,29 +1,22 @@
 function normalizeApiBase(raw) {
-  let base = (raw || 'http://127.0.0.1:8000/api').trim().replace(/\/+$/, '')
-  // Accept either "...vercel.app" or "...vercel.app/api"
+  let base = String(raw || '').trim().replace(/\/+$/, '')
+  if (!base) return base
   if (!base.endsWith('/api')) {
     base = `${base}/api`
   }
   return base
 }
 
-const API_BASE = normalizeApiBase(import.meta.env.VITE_API_BASE_URL)
-
-function assertApiConfigured() {
-  const onVercel =
-    typeof window !== 'undefined' &&
-    window.location.hostname.includes('vercel.app')
-  const pointsLocal =
-    API_BASE.includes('127.0.0.1') || API_BASE.includes('localhost')
-  if (onVercel && pointsLocal) {
-    throw new Error(
-      'Frontend is still calling localhost. In Vercel → Frontend → Env, set VITE_API_BASE_URL=https://backend-ten-gilt-82.vercel.app/api then Redeploy.',
-    )
-  }
-}
+// IMPORTANT: Vercel builds from Git; gitignored .env is NOT used unless you set
+ // Project → Environment Variables. PROD fallback guarantees the live site works.
+const API_BASE = normalizeApiBase(
+  import.meta.env.VITE_API_BASE_URL ||
+    (import.meta.env.PROD
+      ? 'https://backend-ten-gilt-82.vercel.app/api'
+      : 'http://127.0.0.1:8000/api'),
+)
 
 export async function planTrip(payload) {
-  assertApiConfigured()
   let res
   try {
     res = await fetch(`${API_BASE}/plan/`, {
@@ -33,7 +26,7 @@ export async function planTrip(payload) {
     })
   } catch (err) {
     throw new Error(
-      `Cannot reach API at ${API_BASE}. Is the backend running? (${err.message})`,
+      `Cannot reach API at ${API_BASE}. (${err.message})`,
     )
   }
   const data = await res.json().catch(() => ({}))
