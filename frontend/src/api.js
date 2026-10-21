@@ -1,6 +1,13 @@
-const API_BASE = (
-  import.meta.env.VITE_API_BASE_URL || 'http://127.0.0.1:8000/api'
-).replace(/\/$/, '')
+function normalizeApiBase(raw) {
+  let base = (raw || 'http://127.0.0.1:8000/api').trim().replace(/\/+$/, '')
+  // Accept either "...vercel.app" or "...vercel.app/api"
+  if (!base.endsWith('/api')) {
+    base = `${base}/api`
+  }
+  return base
+}
+
+const API_BASE = normalizeApiBase(import.meta.env.VITE_API_BASE_URL)
 
 function assertApiConfigured() {
   const onVercel =
@@ -10,7 +17,7 @@ function assertApiConfigured() {
     API_BASE.includes('127.0.0.1') || API_BASE.includes('localhost')
   if (onVercel && pointsLocal) {
     throw new Error(
-      'Frontend is still calling localhost. In Vercel → weather-truck (FE) → Settings → Environment Variables, set VITE_API_BASE_URL=https://YOUR-BACKEND.vercel.app/api then Redeploy.',
+      'Frontend is still calling localhost. In Vercel → Frontend → Env, set VITE_API_BASE_URL=https://weather-truck-routing-l783.vercel.app/api then Redeploy.',
     )
   }
 }
