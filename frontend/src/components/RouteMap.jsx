@@ -68,16 +68,18 @@ function haversineKm(lat1, lon1, lat2, lon2) {
   return 2 * r * Math.asin(Math.sqrt(a))
 }
 
-/** Keep heatmap dots only along the selected route corridor. */
-function nearSelectedRoute(lat, lon, coordinates, maxKm = 12) {
-  if (!coordinates?.length) return false
-  const step = Math.max(1, Math.floor(coordinates.length / 120))
-  for (let i = 0; i < coordinates.length; i += step) {
-    const [clat, clon] = coordinates[i]
-    if (haversineKm(lat, lon, clat, clon) <= maxKm) return true
+/** Nearest weather sample point for a lat/lon on the selected path. */
+function nearestHeatPoint(lat, lon, heatmapPoints) {
+  let best = null
+  let bestKm = Infinity
+  for (const p of heatmapPoints || []) {
+    const d = haversineKm(lat, lon, p.lat, p.lon)
+    if (d < bestKm) {
+      bestKm = d
+      best = p
+    }
   }
-  const [elat, elon] = coordinates[coordinates.length - 1]
-  return haversineKm(lat, lon, elat, elon) <= maxKm
+  return bestKm <= 40 ? best : null
 }
 
 export default function RouteMap({
@@ -100,28 +102,75 @@ export default function RouteMap({
     return [39.5, -98.35]
   }, [result])
 
+  // Circles sit ON the selected route only (weather looked up from nearest forecast point)
   const heatmapLayers = useMemo(() => {
     if (!showHeatmap || !result?.heatmap?.points || !selectedRoute) return []
     const coords = selectedRoute.coordinates || []
-    return result.heatmap.points
-      .filter((p) => nearSelectedRoute(p.lat, p.lon, coords))
-      .map((p) => {
-        const sample = heatmapSampleAtHour(p, forecastHour, result.departure)
-        if (!sample) return null
-        const risk = conditionsToRisk(
-          sample.wind_mph,
-          sample.rain_in_hr,
-          sample.snow_in_hr,
-          loadLb,
+    if (!coords.length) return []
+    const step = Math.max(1, Math.floor(coords.length / 35))
+    const layers = []
+    for (let i = 0; i < coords.length; i += step) {
+      const [lat, lon] = coords[i]
+      const weatherPt = nearestHeatPoint(lat, lon, result.heatmap.points)
+      if (!weatherPt) continue
+      const sample = heatmapSampleAtHour(
+        weatherPt,
+        forecastHour,
+        result.departure,
+      )
+      if (!sample) continue
+      const risk = conditionsToRisk(
+        sample.wind_mph,
+        sample.rain_in_hr,
+        sample.snow_in_hr,
+        loadLb,
+      )
+      const strength = weatherStrength(
+        sample.wind_mph,
+        sample.rain_in_hr,
+        sample.snow_in_hr,
+      )
+      layers.push({ lat, lon, risk, sample, strength })
+    }
+    // always include destination
+    const [dlat, dlon] = coords[coords.length - 1]
+    if (
+      !layers.length ||
+      haversineKm(
+        layers[layers.length - 1].lat,
+        layers[layers.length - 1].lon,
+        dlat,
+        dlon,
+      ) > 2
+    ) {
+      const weatherPt = nearestHeatPoint(dlat, dlon, result.heatmap.points)
+      if (weatherPt) {
+        const sample = heatmapSampleAtHour(
+          weatherPt,
+          forecastHour,
+          result.departure,
         )
-        const strength = weatherStrength(
-          sample.wind_mph,
-          sample.rain_in_hr,
-          sample.snow_in_hr,
-        )
-        return { lat: p.lat, lon: p.lon, risk, sample, strength }
-      })
-      .filter(Boolean)
+        if (sample) {
+          layers.push({
+            lat: dlat,
+            lon: dlon,
+            risk: conditionsToRisk(
+              sample.wind_mph,
+              sample.rain_in_hr,
+              sample.snow_in_hr,
+              loadLb,
+            ),
+            sample,
+            strength: weatherStrength(
+              sample.wind_mph,
+              sample.rain_in_hr,
+              sample.snow_in_hr,
+            ),
+          })
+        }
+      }
+    }
+    return layers
   }, [result, forecastHour, showHeatmap, loadLb, selectedRoute])
 
   const heatmapStats = useMemo(() => {
