@@ -12,14 +12,19 @@ load_dotenv(BASE_DIR / ".env")
 
 SECRET_KEY = os.getenv("DJANGO_SECRET_KEY", "insecure-dev-key")
 DEBUG = os.getenv("DJANGO_DEBUG", "True").lower() in ("1", "true", "yes")
-ALLOWED_HOSTS = [
+# Always allow Vercel / local hosts (merge with env so misconfigured env can't break deploy)
+_ALLOWED_DEFAULTS = {
+    "localhost",
+    "127.0.0.1",
+    ".vercel.app",
+    ".onrender.com",
+}
+_ALLOWED_FROM_ENV = {
     h.strip()
-    for h in os.getenv(
-        "DJANGO_ALLOWED_HOSTS",
-        "localhost,127.0.0.1,.vercel.app,.onrender.com",
-    ).split(",")
+    for h in os.getenv("DJANGO_ALLOWED_HOSTS", "").split(",")
     if h.strip()
-]
+}
+ALLOWED_HOSTS = sorted(_ALLOWED_DEFAULTS | _ALLOWED_FROM_ENV)
 
 INSTALLED_APPS = [
     "django.contrib.admin",
@@ -90,7 +95,9 @@ CORS_ALLOWED_ORIGINS = [
     o.strip()
     for o in os.getenv(
         "CORS_ALLOWED_ORIGINS",
-        "http://localhost:5173,http://127.0.0.1:5173,https://weather-truck-sandy.vercel.app",
+        "http://localhost:5173,http://127.0.0.1:5173,"
+        "https://weather-truck-routing-two.vercel.app,"
+        "https://weather-truck-sandy.vercel.app",
     ).split(",")
     if o.strip()
 ]

@@ -17,7 +17,7 @@ function assertApiConfigured() {
     API_BASE.includes('127.0.0.1') || API_BASE.includes('localhost')
   if (onVercel && pointsLocal) {
     throw new Error(
-      'Frontend is still calling localhost. In Vercel → Frontend → Env, set VITE_API_BASE_URL=https://weather-truck-routing-l783.vercel.app/api then Redeploy.',
+      'Frontend is still calling localhost. In Vercel → Frontend → Env, set VITE_API_BASE_URL=https://backend-ten-gilt-82.vercel.app/api then Redeploy.',
     )
   }
 }
